@@ -10,105 +10,84 @@ const description = document.querySelector('.weather-box .description');
 const humidity = document.querySelector('.weather-details .humidity span');
 const wind = document.querySelector('.weather-details .wind span');
 
-// WARNING: API keys in client-side code are publicly visible.
-// For production use, proxy requests through a backend server.
-// Get your free key at https://openweathermap.org/api
-const APIKey = 'YOUR_API_KEY_HERE';
+// WMO weather code to image/description mapping
+function getWeatherInfo(code) {
+    if (code === 0) return { img: 'images/clear.gif', alt: 'Clear weather meme', desc: 'Clear sky' };
+    if (code <= 3) return { img: 'images/cloud.gif', alt: 'Cloudy weather meme', desc: 'Partly cloudy' };
+    if (code <= 48) return { img: 'images/mist.gif', alt: 'Misty weather meme', desc: 'Fog' };
+    if (code <= 57) return { img: 'images/rain.gif', alt: 'Rainy weather meme', desc: 'Drizzle' };
+    if (code <= 67) return { img: 'images/rain.gif', alt: 'Rainy weather meme', desc: 'Rain' };
+    if (code <= 77) return { img: 'images/snow.gif', alt: 'Snowy weather meme', desc: 'Snow' };
+    if (code <= 82) return { img: 'images/rain.gif', alt: 'Rainy weather meme', desc: 'Rain showers' };
+    if (code <= 86) return { img: 'images/snow.gif', alt: 'Snowy weather meme', desc: 'Snow showers' };
+    if (code <= 99) return { img: 'images/rain.gif', alt: 'Rainy weather meme', desc: 'Thunderstorm' };
+    return { img: 'images/cloud.gif', alt: 'Weather meme', desc: 'Unknown' };
+}
 
-function performSearch() {
+function showError(message) {
+    container.classList.remove('weather-active');
+    container.classList.add('error-active');
+    weatherBox.style.display = 'none';
+    weatherDetails.style.display = 'none';
+    error404.querySelector('p').textContent = message;
+    error404.style.display = 'block';
+    error404.classList.add('fadeIn');
+}
+
+async function performSearch() {
     const city = input.value;
 
     if (city === '')
         return;
-
-    // Reset error text to default
-    error404.querySelector('p').textContent = 'OOPS! INVALID LOCATION :/';
 
     // Reset animations so they can replay
     weatherBox.classList.remove('fadeIn');
     weatherDetails.classList.remove('fadeIn');
     error404.classList.remove('fadeIn');
 
-    fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&appid=${APIKey}`)
-        .then(response => response.json())
-        .then(json => {
+    try {
+        // Step 1: Geocode city name to coordinates (Open-Meteo — no API key needed)
+        const geoRes = await fetch(
+            `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`
+        );
+        const geoJson = await geoRes.json();
 
-            if (json.cod === '404') {
-                container.classList.remove('weather-active');
-                container.classList.add('error-active');
-                weatherBox.style.display = 'none';
-                weatherDetails.style.display = 'none';
-                error404.style.display = 'block';
-                error404.classList.add('fadeIn');
-                return;
-            }
+        if (!geoJson.results || geoJson.results.length === 0) {
+            showError('OOPS! INVALID LOCATION :/');
+            return;
+        }
 
-            error404.style.display = 'none';
-            error404.classList.remove('fadeIn');
+        const { latitude, longitude } = geoJson.results[0];
 
-            switch (json.weather[0].main) {
-                case 'Clear':
-                    image.src = 'images/clear.gif';
-                    image.alt = 'Clear weather meme';
-                    break;
+        // Step 2: Fetch current weather using coordinates
+        const weatherRes = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code`
+        );
+        const weatherJson = await weatherRes.json();
+        const current = weatherJson.current;
 
-                case 'Rain':
-                case 'Drizzle':
-                case 'Thunderstorm':
-                    image.src = 'images/rain.gif';
-                    image.alt = 'Rainy weather meme';
-                    break;
+        error404.style.display = 'none';
+        error404.classList.remove('fadeIn');
 
-                case 'Snow':
-                    image.src = 'images/snow.gif';
-                    image.alt = 'Snowy weather meme';
-                    break;
+        const weather = getWeatherInfo(current.weather_code);
+        image.src = weather.img;
+        image.alt = weather.alt;
 
-                case 'Clouds':
-                    image.src = 'images/cloud.gif';
-                    image.alt = 'Cloudy weather meme';
-                    break;
+        temperature.innerHTML = `${Math.round(current.temperature_2m)}<span>°C</span>`;
+        description.textContent = weather.desc;
+        humidity.textContent = `${current.relative_humidity_2m}%`;
+        wind.textContent = `${Math.round(current.wind_speed_10m)}Km/h`;
 
-                case 'Mist':
-                case 'Haze':
-                case 'Fog':
-                case 'Smoke':
-                case 'Dust':
-                case 'Sand':
-                case 'Ash':
-                case 'Squall':
-                case 'Tornado':
-                    image.src = 'images/mist.gif';
-                    image.alt = 'Misty weather meme';
-                    break;
+        weatherBox.style.display = '';
+        weatherDetails.style.display = '';
+        weatherBox.classList.add('fadeIn');
+        weatherDetails.classList.add('fadeIn');
+        container.classList.remove('error-active');
+        container.classList.add('weather-active');
 
-                default:
-                    image.src = 'images/cloud.gif';
-                    image.alt = 'Weather meme';
-            }
-
-            temperature.innerHTML = `${parseInt(json.main.temp)}<span>°C</span>`;
-            description.textContent = json.weather[0].description;
-            humidity.textContent = `${json.main.humidity}%`;
-            wind.textContent = `${parseInt(json.wind.speed)}Km/h`;
-
-            weatherBox.style.display = '';
-            weatherDetails.style.display = '';
-            weatherBox.classList.add('fadeIn');
-            weatherDetails.classList.add('fadeIn');
-            container.classList.remove('error-active');
-            container.classList.add('weather-active');
-
-        })
-        .catch(() => {
-            container.classList.remove('weather-active');
-            container.classList.add('error-active');
-            weatherBox.style.display = 'none';
-            weatherDetails.style.display = 'none';
-            error404.querySelector('p').textContent = 'Network error. Please try again.';
-            error404.style.display = 'block';
-            error404.classList.add('fadeIn');
-        });
+    } catch {
+        showError('Network error. Please try again.');
+    }
 }
 
 search.addEventListener('click', performSearch);
