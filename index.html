@@ -17,17 +17,18 @@
     <div class="container">
         <div class="search-box">
             <i class="fa-solid fa-location-dot"></i>
-            <input type="text" placeholder="Enter your location">
-            <button class="fa-solid fa-magnifying-glass"></button>
+            <label for="location-input" class="visually-hidden">Location</label>
+            <input id="location-input" type="text" placeholder="Enter your location">
+            <button class="fa-solid fa-magnifying-glass" aria-label="Search weather"></button>
         </div>
 
         <div class="not-found">
-            <img src="images/404.png">
+            <img src="images/404.png" alt="Location not found">
             <p>OOPS! INVALID LOCATION :/</p>
         </div>
 
         <div class="weather-box">
-            <img src="">
+            <img src="" alt="Current weather condition">
             <p class="temperature"></p>
             <p class="description"></p>
         </div>
